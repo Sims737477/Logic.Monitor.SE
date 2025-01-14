@@ -100,6 +100,8 @@
 .NOTES
     The function throws an error if it fails to set up any component.
 #>
+
+#TODO: Update information above. 
 Function Initialize-LMSITemplateSetup {
     
     [CmdletBinding(DefaultParameterSetName = 'Individual')]
@@ -161,13 +163,6 @@ Function Initialize-LMSITemplateSetup {
                     "predef.bizservice.members"          = "$ServiceInsightProps"
                 }
 
-                #Build custom props hashtable
-                $customProperties = @()
-                Foreach ($Key in $SIProperties.Keys) {
-                    $customProperties += @{name = $Key; value = $SIProperties[$Key] }
-                }
-                Write-Host $customProperties
-
                 #Create new SI resource
                 $ServiceInsightResource = Get-LMDevice -name "SI_Prop_Normalizer"
                 If(!$ServiceInsightResource){
@@ -176,9 +171,13 @@ Function Initialize-LMSITemplateSetup {
                 }
                 Else{
                     Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
-                    #Upload SI datasource from xml
                 }
             }
+
+            #TODO Deploy the PropSource Normalizer (Where do we host the XML?)
+            #Can we add the normalized properties as a function too? 
+            #Reverse Engineer those APIs 
+
 
 
         }
