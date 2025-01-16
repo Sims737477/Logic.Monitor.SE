@@ -1,95 +1,18 @@
 <#
 .SYNOPSIS
-    This function initializes the Logic Monitor (POV) setup for SEs by automating various tasks required during POV setup.
+    This function initializes a LogicMonitor ServiceInsight that contains default standardized properties that all clients should utilize in SI Templates. 
+    It also pushes the PropertySource that will make those properties Auto.props. 
 
 .DESCRIPTION
-    The Initialize-LMPOVSetup function sets up various components of the Logic Monitor POV. 
-    It can set up the website, portal metrics, alert analysis, and LM container. 
-    The setup for each component can be controlled individually or all at once.
+    The Initialize LMSITemplate Setup script generates an SI that contains normalized properties, then pushes a PropertySource to turn those into Auto.props. 
 
-.PARAMETER Website
-    The name of the website to be set up. This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER WebsiteHttpType
-    The HTTP type of the website. Defaults to "https". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER PortalMetricsAPIUsername
-    The username for the Portal Metrics API. Defaults to "lm_portal_metrics". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER LogsAPIUsername
-    The username for the Logs API. Defaults to "lm_logs". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER SetupWebsite
-    A switch to control the setup of the website. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER SetupPortalMetrics
-    A switch to control the setup of the portal metrics. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER SetupAlertAnalysis
-    A switch to control the setup of the alert analysis. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER SetupLMContainer
-    A switch to control the setup of the LM container. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER LMContainerAPIUsername
-    The username for the LM Container API. Defaults to "lm_container". This parameter is used in both 'All' and 'Individual' parameter sets.
+.PARAMETER SetupDummyServiceInsight
+    A switch to control the setup of the LM SI. This parameter is used in the 'Individual' parameter set.
 
 .EXAMPLE
-    Initialize-LMPOVSetup -RunAll -IncludeDefaults -Website example.com
+    Initialize-LMSITemplateSetup -SetupDummyServiceInsight
 
-    This command runs all setup processes including default options and creates a webcheck for example.com.
-
-.INPUTS
-    The function does not accept input from the pipeline.
-
-.OUTPUTS
-    The function does not return any output.
-
-.NOTES
-    The function throws an error if it fails to set up any component.
-#>
-
-
-<#
-.SYNOPSIS
-    This function initializes the Logic Monitor (POV) setup for SEs by automating various tasks required during POV setup.
-
-.DESCRIPTION
-    The Initialize-LMPOVSetup function sets up various components of the Logic Monitor POV. 
-    It can set up the website, portal metrics, alert analysis, and LM container. 
-    The setup for each component can be controlled individually or all at once.
-
-.PARAMETER Website
-    The name of the website to be set up. This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER WebsiteHttpType
-    The HTTP type of the website. Defaults to "https". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER PortalMetricsAPIUsername
-    The username for the Portal Metrics API. Defaults to "lm_portal_metrics". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER LogsAPIUsername
-    The username for the Logs API. Defaults to "lm_logs". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.PARAMETER SetupWebsite
-    A switch to control the setup of the website. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER SetupPortalMetrics
-    A switch to control the setup of the portal metrics. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER SetupAlertAnalysis
-    A switch to control the setup of the alert analysis. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER SetupLMContainer
-    A switch to control the setup of the LM container. This parameter is used in the 'Individual' parameter set.
-
-.PARAMETER LMContainerAPIUsername
-    The username for the LM Container API. Defaults to "lm_container". This parameter is used in both 'All' and 'Individual' parameter sets.
-
-.EXAMPLE
-    Initialize-LMPOVSetup -RunAll -IncludeDefaults -Website example.com
-
-    This command runs all setup processes including default options and creates a webcheck for example.com.
+    This command runs all setup processes for the SI and PropSource
 
 .INPUTS
     The function does not accept input from the pipeline.
@@ -160,18 +83,37 @@ Function Initialize-LMSITemplateSetup {
                     "sn.service_component" = "fill_me_in"
                     "sn.application"     = "fill_me_in"
                     "sn.customer"        = "fill_me_in"
+                    "DummyService"       = "True"
                     "predef.bizservice.members"          = "$ServiceInsightProps"
                 }
 
-                #Create new SI resource
-                $ServiceInsightResource = Get-LMDevice -name "SI_Prop_Normalizer"
-                If(!$ServiceInsightResource){
-                    Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) is deploying" -ForegroundColor Gray
-                    $ServiceInsightResource = New-LMDevice -name "SI_Prop_Normalizer" -DisplayName "LogicMonitor SI Property Normalizer" -PreferredCollectorId -4 -DeviceType 6 -Properties $SIProperties
+                #Before provisioning the SI we need an active collector for the PropSource to work. 
+                $collector = Get-LMCollector -Filter @{isDown = "false"} -BatchSize 1
+                
+                if ($collector) {
+                    #Create new SI resource
+                    $ServiceInsightResource = Get-LMDevice -name "SI_Prop_Normalizer"
+                    If(!$ServiceInsightResource){
+                        Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) is deploying" -ForegroundColor Gray
+                        $ServiceInsightResource = New-LMDevice -name "SI_Prop_Normalizer" -DisplayName "LogicMonitor SI Property Normalizer" -PreferredCollectorId $collector.id -DeviceType 6 -Properties $SIProperties
+                    }
+                    Else{
+                        Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
+                    }
+                }else{
+                    # IF we don't have a collector we can still provision the SI, but the propsource won't run and the collector needs to be manually assigned. 
+                    #Create new SI resource
+                    $ServiceInsightResource = Get-LMDevice -name "SI_Prop_Normalizer"
+                    If(!$ServiceInsightResource){
+                        Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) is deploying" -ForegroundColor Gray
+                        $ServiceInsightResource = New-LMDevice -name "SI_Prop_Normalizer" -DisplayName "LogicMonitor SI Property Normalizer" -PreferredCollectorId -4 -DeviceType 6 -Properties $SIProperties
+                        Write-Error "The SI Prop Normalizer was deployed, but there were no active Collectors to assign to the SI. Please manually assign the collector."
+                    }
+                    Else{
+                        Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
+                    }
                 }
-                Else{
-                    Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
-                }
+                
             }
 
             #TODO Deploy the PropSource Normalizer (Where do we host the XML?)
