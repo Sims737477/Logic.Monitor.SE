@@ -24,7 +24,6 @@
     The function throws an error if it fails to set up any component.
 #>
 
-#TODO: Update information above. 
 Function Initialize-LMSITemplateSetup {
     
     [CmdletBinding(DefaultParameterSetName = 'Individual')]
@@ -117,6 +116,8 @@ Function Initialize-LMSITemplateSetup {
                         Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
                     }
                 }
+
+                # Check and deploy the PropertySource used to add auto.props for normalization. 
                 $NormalizingPropSource = Get-LMPropertySource -Name "NormalisedProps"
                 if (!$NormalizingPropSource){
                     #Upload PropertyNormalizer PropertySource. 
@@ -135,10 +136,6 @@ Function Initialize-LMSITemplateSetup {
                 
                 
             }
-
-            #TODO Deploy the PropSource Normalizer (Where do we host the XML?)
-            #Can we add the normalized properties as a function too? 
-            #Reverse Engineer those APIs 
 
         }
         Else {
