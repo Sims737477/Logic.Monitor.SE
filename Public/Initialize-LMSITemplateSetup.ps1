@@ -46,6 +46,9 @@ Function Initialize-LMSITemplateSetup {
 
             #Create dummy service insight that hosts properties for normalization
             If($SetupDummyServiceInsight){
+                # Base URI for module templates
+                $GitubURI = "https://raw.githubusercontent.com/Sims737477"
+
                 $ServiceInsightProps = @{
                     device = @(
                         @{
@@ -88,19 +91,20 @@ Function Initialize-LMSITemplateSetup {
                 }
 
                 #Before provisioning the SI we need an active collector for the PropSource to work. 
-                $collector = Get-LMCollector -Filter @{isDown = "false"} -BatchSize 1
+                $collector = Get-LMCollector -BatchSize 1
                 
                 if ($collector) {
                     #Create new SI resource
                     $ServiceInsightResource = Get-LMDevice -name "SI_Prop_Normalizer"
                     If(!$ServiceInsightResource){
                         Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) is deploying" -ForegroundColor Gray
-                        $ServiceInsightResource = New-LMDevice -name "SI_Prop_Normalizer" -DisplayName "LogicMonitor SI Property Normalizer" -PreferredCollectorId $collector.id -DeviceType 6 -Properties $SIProperties
+                        $ServiceInsightResource = New-LMDevice -name "SI_Prop_Normalizer" -DisplayName "LogicMonitor SI Property Normalizer" -PreferredCollectorId $collector[0].id -DeviceType 6 -Properties $SIProperties
                     }
                     Else{
                         Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
                     }
                 }else{
+                    Write-Error "[ERROR]: There are no collectors in the portal. Please assign a collector to the Service once they're available." 
                     # IF we don't have a collector we can still provision the SI, but the propsource won't run and the collector needs to be manually assigned. 
                     #Create new SI resource
                     $ServiceInsightResource = Get-LMDevice -name "SI_Prop_Normalizer"
@@ -113,14 +117,28 @@ Function Initialize-LMSITemplateSetup {
                         Write-Host "[INFO]: Service insight resource (LogicMonitor SI Property Normalizer) already exists, skipping creation" -ForegroundColor Gray
                     }
                 }
+                $NormalizingPropSource = Get-LMPropertySource -Name "NormalisedProps"
+                if (!$NormalizingPropSource){
+                    #Upload PropertyNormalizer PropertySource. 
+                    Try{
+                        $NormalizingPropSource = (Invoke-WebRequest -Uri "$GitubURI/LM_templates/main/NormalisedProps.json" -UseBasicParsing).Content
+                        Import-LMLogicModule -File $NormalizingPropSource -Type propertyrules -ErrorAction Stop
+                    }
+                    Catch{
+                        #Error
+                        Write-Error "[ERROR]: Unable to add PropertySource template from source: $_" 
+                    }
+
+                }else{
+                    Write-Host "[INFO]: Property Normalizing PropSource Already Exists." -ForegroundColor Gray
+                }
+                
                 
             }
 
             #TODO Deploy the PropSource Normalizer (Where do we host the XML?)
             #Can we add the normalized properties as a function too? 
             #Reverse Engineer those APIs 
-
-
 
         }
         Else {
